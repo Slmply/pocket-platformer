@@ -1,0 +1,135 @@
+class DefaultMovingPlatform extends InteractiveLevelObject {
+
+    constructor(x, y, tileSize, type, hitBoxOffset, tilemapHandler, extraAttributes = {}) {
+        super(x, y, tileSize, type, hitBoxOffset, extraAttributes);
+        this.tilemapHandler = tilemapHandler;
+        this.player = tilemapHandler.player;
+        this.tileSize = tilemapHandler.tileSize;
+        this.key = this.makeid(5);
+        this.adaptWidthToSize();
+        this.colissionFunction = this.fakeColission;
+    }
+    
+    fakeColission(obj, levelObject) {
+        return Collision.objectsColliding(obj, levelObject.fakeHitBox);
+    }
+
+    collisionEvent() {
+        this.player.previouslyTouchedByMovingPlatform = true;
+    }
+
+    
+    adaptWidthToSize() {
+        this.width = this.size * this.tilemapHandler.tileSize;
+        this.fakeHitBox = {
+            y: this.y - 1,
+            x: this.getHitBoxXOffset(),
+            width: this.width,
+            height: this.height,
+            hitBoxOffset: 0,
+        };
+        this.centerIndex = 0;
+
+        if (this.size > 1) {
+            this.centerIndex = (this.size - 1) / 2;
+        }
+    }
+
+    getHitBoxXOffset() {
+        return this.x - ((this.size - 1) / 2 * this.tileSize);
+    }
+
+    addChangeableAttribute(attribute, value, levelToChange = null) {
+        super.addChangeableAttribute(attribute, value, levelToChange);
+        if (attribute === SpritePixelArrays.changeableAttributeTypes.size) {
+            this.adaptWidthToSize();
+        }
+    }
+
+    setPlayerMomentumCoyoteFrames() {
+        if (this.player.movingPlatformKey === this.key &&
+            (this.xspeed !== 0 || this.yspeed < 0)) {
+            this.player.currentMomentumCoyoteFrame = 0;
+            this.player.momentumBonusSpeedX = this.xspeed;
+            this.player.momentumBonusSpeedY = this.yspeed;
+        }
+    }
+
+    /**
+     * Get all objects (player + enemies) that are on this platform
+     */
+    getObjectsOnPlatform() {
+        const objects = [this.player];
+        
+        // Add any enemies on this platform
+        if (this.tilemapHandler.enemies) {
+            this.tilemapHandler.enemies.forEach(enemy => {
+                if (enemy.movingPlatformKey === this.key) {
+                    objects.push(enemy);
+                }
+            });
+        }
+        
+        return objects.filter(obj => obj.movingPlatformKey === this.key);
+    }
+
+    /**
+     * Update all objects on this platform
+     */
+    updateObjectsOnPlatform() {
+        const objectsOnPlatform = this.getObjectsOnPlatform();
+        objectsOnPlatform.forEach(obj => {
+            MovingPlatformHandler.updateSingleObjectOnPlatform(this, obj);
+        });
+    }
+
+    drawPlatformsInGame(index) {
+        if (this?.spriteObject?.[0].animation.length > 1) {
+            if (this.checkFrame()) {
+                Display.drawImage(spriteCanvas, 0, this.canvasYSpritePos, this.tileSize, this.tileSize,
+                    this.fakeHitBox.x + index * this.tileSize, this.y,
+                    this.tileSize, this.tileSize);
+            }
+            else {
+                Display.drawImage(spriteCanvas, this.tileSize, this.canvasYSpritePos, this.tileSize,
+                    this.tileSize, this.fakeHitBox.x + index * this.tileSize, this.y,
+                    this.tileSize, this.tileSize);
+            }
+        }
+        else {
+            Display.drawImage(spriteCanvas, 0, this.canvasYSpritePos, this.tileSize, this.tileSize,
+                this.fakeHitBox.x + index * this.tileSize, this.y,
+                this.tileSize, this.tileSize);
+        }
+    }
+
+    drawAdditionalPlatform(index) {
+        if (Game.playMode === Game.PLAY_MODE) {
+            this.drawPlatformsInGame(index);
+        }
+        else {
+            Display.drawImageWithAlpha(spriteCanvas, 0, this.canvasYSpritePos, this.tileSize, this.tileSize,
+                this.fakeHitBox.x + index * this.tileSize, this.y,
+                this.tileSize, this.tileSize, index === this.centerIndex ? 1 : 0.6);
+        }
+    }
+
+    updateMovement() {
+        if (this.yspeed < 0 || this.xspeed !== 0) {
+            this.fakeHitBox.y = this.y - 1;
+            this.fakeHitBox.x = this.getHitBoxXOffset();
+        }
+
+        // Update all objects on this platform
+        this.updateObjectsOnPlatform();
+
+        if (this.yspeed >= 0) {
+            this.fakeHitBox.y = this.y - 1;
+            this.fakeHitBox.x = this.getHitBoxXOffset();
+        }
+
+        for (var i = 0; i < this.size; i++) {
+            this.drawAdditionalPlatform(i);
+        }
+    }
+}

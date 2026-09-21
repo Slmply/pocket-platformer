@@ -1,0 +1,403 @@
+class TileMapHandler {
+
+    constructor(tileSize, startingLevel, spriteCanvas, player) {
+        this.setTileTypes();
+        this.tileSize = tileSize;
+        this.halfTileSize = tileSize / 2;
+        this.pixelArrayUnitAmount = 8;
+        this.pixelArrayUnitSize = tileSize / this.pixelArrayUnitAmount;
+        this.player = player;
+        this.effects = [];
+        this.currentLevel = startingLevel;
+        this.spriteCanvas = spriteCanvas;
+        this.currentGeneralFrameCounter = 0;
+        this.generalFrameCounterMax = 480;
+        this.jumpSwitchBlockTypes = {
+            violet: "VIOLET",
+            pink: "PINK",
+        }
+    }
+
+    setTileTypes() {
+        this.TILE_TYPES = {};
+        SpritePixelArrays.allTileSprites().forEach(sprite => {
+            const canvasYPos = SpritePixelArrays.getCanvasSpriteYPosition(SpritePixelArrays.getIndexOfSprite(sprite.name));
+            this.TILE_TYPES[sprite.name] = canvasYPos;
+        });
+    }
+
+    updateYCanvasAttributeForSetObjects() {
+        this.levelObjects.forEach(levelObject => {
+            if (levelObject.extraAttributes.customName) {
+                const spriteObject = SpritePixelArrays.getSpritesByDescrpitiveName(levelObject.extraAttributes.customName);
+                levelObject.canvasYSpritePos = spriteObject?.[0].canvasYPos;
+            }
+        })
+        this.deko.forEach(dekoObject => {
+            const spriteIndex = SpritePixelArrays.getIndexOfSprite(dekoObject.type, dekoObject.dekoIndex);
+            const spriteObject = [SpritePixelArrays.getSpritesByIndex(spriteIndex)];
+            const canvasYSpritePos = spriteObject?.[0].canvasYPos;
+            dekoObject.canvasYSpritePos = canvasYSpritePos;
+        })
+        this.setTileTypes();
+    }
+
+    resetLevel(levelIndex) {
+        SFXHandler.resetSfx();
+        this.tileMap = WorldDataHandler.levels[levelIndex].tileData;
+        Camera.updateViewportRelatedToScale(WorldDataHandler.levels[levelIndex].zoomFactor || 1)
+        ImageHandler.setBackgroundImage();
+        this.updateLevelDimensions();
+        this.setInitialPlayerAndCameraPos(levelIndex);
+        this.levelObjects = [];
+        this.levelObjects = this.createInitialObjects(WorldDataHandler.levels[levelIndex].levelObjects);
+        this.deko = this.createInitialDeko(WorldDataHandler.levels[levelIndex].deko);
+        this.enemies = this.createInitialObjects(WorldDataHandler.levels[levelIndex].enemies);
+        this.weapons = this.createInitialObjects(
+            (WorldDataHandler.levels[levelIndex].weapons || []).filter(w =>
+                !this.player.weapons.some(pw => pw.type === w.type)
+            )
+        );
+        this.paths = this.createInitialPaths(WorldDataHandler.levels[levelIndex].paths);
+        this.effects = EffectsHandler.getCurrentLevelEffects(this.currentLevel);
+        this.currentGeneralFrameCounter = 0;
+        this.defeatedEnemyCount = 0;
+        this.player.resetAll();
+        WorldColorChanger.changeLevelColor(levelIndex);
+        this.changeTileCanvasSize();
+        this.createStaticTiles();
+        SoundHandler.checkSongOnLevelReset(levelIndex);
+        this.currentJumpSwitchBlockType = this.jumpSwitchBlockTypes.violet;
+    }
+
+    changeJumpSwitchBlockType() {
+        if (this.currentJumpSwitchBlockType === this.jumpSwitchBlockTypes.violet) {
+            this.currentJumpSwitchBlockType = this.jumpSwitchBlockTypes.pink
+        }
+        else {
+            this.currentJumpSwitchBlockType = this.jumpSwitchBlockTypes.violet;
+        }
+    }
+
+    setInitialPlayerAndCameraPos(levelIndex) {
+        //This is a fallback, in case no flag was set in a level (start, ending, or if user forgot to set it)
+        let initialPlayerValue = { x: 0, y: 0 };
+        WorldDataHandler.levels[levelIndex].levelObjects.forEach(levelObject => {
+            if (levelObject.type === ObjectTypes.START_FLAG) {
+                initialPlayerValue.x = levelObject.x * this.tileSize;
+                initialPlayerValue.y = levelObject.y * this.tileSize;
+            }
+        })
+        this.player.initialY = initialPlayerValue.x;
+        this.player.initialX = initialPlayerValue.y;
+        Camera.moveTo(initialPlayerValue.x, initialPlayerValue.y);
+
+        //startRemoval 
+        if (typeof LevelSizeHandler === 'function') {
+            LevelSizeHandler.updateCameraSliders(this.levelWidth * this.tileSize, this.levelHeight * this.tileSize, initialPlayerValue);
+        }
+        //endRemoval
+    }
+
+    updateLevelDimensions() {
+        this.levelWidth = this.getLevelWidth();
+        this.levelHeight = this.getLevelHeight();
+        this.levelHeightInPx = this.levelHeight * this.tileSize;
+        this.levelWidthInPx = this.levelWidth * this.tileSize;
+        if (Camera.viewport) {
+            Camera.viewport.worldWidth = this.levelWidth * this.tileSize;
+            Camera.viewport.worldHeight = this.levelHeight * this.tileSize;
+        }
+    }
+
+    createInitialPaths(initialPaths) {
+        var paths = [];
+        initialPaths && initialPaths.forEach(initialPath => {
+            const { speed, stopFrames, movementDirection, pathVariant } = initialPath;
+            let newPath = new Path(this, speed, stopFrames, movementDirection);
+            newPath.pathVariant = pathVariant;
+            newPath.pathPoints = initialPath.pathPoints.map(pathPoint =>
+                new PathPoint(pathPoint.initialX, pathPoint.initialY, this.tileSize, pathPoint.alignment));
+            newPath.checkObjectsOnPath();
+            newPath.rearrangePathPoints();
+            paths.push(newPath);
+        });
+        return paths;
+    }
+
+    /*
+    *  Playlist generation upon running game 
+    */
+    generatePlaylist() {
+        const totalLevels = WorldDataHandler.levels.length;
+        const endingScreenIndex = totalLevels - 1;
+        const finalPlayableIndex = totalLevels - 2; 
+
+        const middleLevels = [];
+        for (let i = 2; i < finalPlayableIndex; i++) {
+            middleLevels.push(i);
+        }
+
+        // Shuffle Middle
+        for (let i = middleLevels.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [middleLevels[i], middleLevels[j]] = [middleLevels[j], middleLevels[i]];
+        }
+        const selectedMiddle = middleLevels.slice(0, 5);
+
+
+        return [1, ...selectedMiddle, finalPlayableIndex, endingScreenIndex];
+    }
+
+    
+    initPlaylist() {
+        this.playlist = this.generatePlaylist();
+        this.playlistIndex = 0;
+        this.currentLevel = this.playlist[0];
+    }
+
+    createInitialObjects(initialObjects) {
+        var levelObjects = [];
+        initialObjects && initialObjects.forEach(initialObject => {
+            const { type, x, y } = initialObject;
+
+            const extraAttributes = initialObject.extraAttributes ? initialObject.extraAttributes : {};
+            const createdObject = new ObjectTypes.objectToClass[type](x,
+                y, this.tileSize, type, this, extraAttributes);
+            if (typeof Enemy !== "undefined" && createdObject instanceof Enemy) {
+                EnemyTypeAttributesHandler.applyToInstance(createdObject);
+            }
+            if (typeof Weapon !== "undefined" && createdObject instanceof Weapon) {
+                WeaponTypeAttributesHandler.applyToInstance(createdObject);
+            }
+            levelObjects.push(createdObject);
+        });
+        return levelObjects;
+    }
+
+    createInitialDeko(initialDekos) {
+        var dekos = [];
+        initialDekos && initialDekos.forEach(initialDeko => {
+            const { x, y, index } = initialDeko;
+            dekos.push(new Deko(x, y, this.tileSize, index));
+        });
+        return dekos;
+    }
+
+    drawGrid() {
+        Display.drawGrid(this.levelWidth, this.levelHeight, this.tileSize);
+    }
+
+    changeTileCanvasSize() {
+        tileCanvas.width = this.levelWidth * this.tileSize;
+        tileCanvas.height = this.levelHeight * this.tileSize;
+        this.createStaticTiles();
+    }
+
+    createStaticTiles() {
+        Display.tileCtx.clearRect(0, 0, this.levelWidth * this.tileSize, this.levelHeight * this.tileSize);
+        for (var tilePosY = 0; tilePosY < this.levelHeight; tilePosY++) {
+            for (var tilePosX = 0; tilePosX < this.levelWidth; tilePosX++) {
+
+                var tileType = this.tileMap[tilePosY][tilePosX];
+                //if we want to make edge tiles deleteable, some exceptions need to be made, like still show tile 5, 14 (cannons), and red/blue blocks
+                if (this.checkIfPositionAtTheEdge(tilePosX, tilePosY) && (tileType === 1 || tileType === 2)) {
+                    tileType = "edge";
+                    if (this.checkIfStartOrEndingLevel()) {
+                        tileType = 0;
+                    }
+                }
+
+                if (tileType !== 0) {
+                    Display.drawImage(this.spriteCanvas, 0, this.TILE_TYPES[tileType],
+                        this.tileSize, this.tileSize, tilePosX * this.tileSize, tilePosY * this.tileSize, this.tileSize, this.tileSize, Display.tileCtx);
+                }
+            }
+        }
+    }
+
+    displayStaticTiles() {
+        const width = this.levelWidth * this.tileSize;
+        const height = this.levelHeight * this.tileSize;
+        Display.drawImage(tileCanvas, 0, 0, width, height,
+            0, 0, width, height);
+    }
+
+    displayObjects(arr) {
+        if (arr) {
+            for (var i = arr.length - 1; i >= 0; i--) {
+                arr[i]?.draw(this.spriteCanvas);
+            }
+        }
+    }
+
+    displayObjectsOrDeko(arr) {
+        if (arr) {
+            for (var i = arr.length - 1; i >= 0; i--) {
+                arr[i].draw(this.spriteCanvas);
+            }
+        }
+    }
+
+    displayLevel() {
+        const isPlayMode = Game.playMode === Game.PLAY_MODE;
+        if (isPlayMode) {
+            if (PauseHandler.paused) {
+                return;
+            }
+        }
+        this.layers = this.splitLevelObjectsInLayers();
+        // water
+        (isPlayMode || LayerHandler.waterLayer) && this.displayObjects(this.layers[0]);
+        (isPlayMode || LayerHandler.decoLayer) && this.displayObjectsOrDeko(this.deko);
+        SFXHandler.updateSfxAnimations("backgroundSFX");
+        isPlayMode && this.effects.length && EffectsRenderer.displayEffects();
+        // paths
+        if (isPlayMode || LayerHandler.objectLayer) {
+            this.displayObjectsOrDeko(this.paths);
+            // normal objects
+            this.displayObjects(this.layers[1]);
+            this.displayObjects(this.layers[2]);
+            //moving platforms
+            this.displayObjects(this.layers[3]);
+        }
+        // tiles
+        if (isPlayMode || LayerHandler.tileLayer) {
+            this.displayStaticTiles();
+        }
+        // enemies
+        this.displayObjects(this.enemies);
+        // weapons in level (not yet picked up)
+        this.displayObjects(this.weapons);
+        // projectiles
+        this.displayObjects(this.layers[4]);
+    }
+
+    displayEnemies(enemies) {
+
+    }
+
+    splitLevelObjectsInLayers() {
+        const layers = [
+            [], [], [], [], [], [], [], [],
+        ];
+        this.levelObjects.forEach(levelObject => {
+            if (SpritePixelArrays.backgroundSprites.includes(levelObject.type)) {
+                layers[0].push(levelObject);
+            }
+            else if (SpritePixelArrays.projectileSprites.includes(levelObject.type)) {
+                layers[4].push(levelObject);
+            }
+            else if (SpritePixelArrays.movingPlatformSprites.includes(levelObject.type)) {
+                layers[3].push(levelObject);
+            }
+            else if (SpritePixelArrays.foregroundSprites.includes(levelObject.type)) {
+                layers[5].push(levelObject);
+            }
+            else if (levelObject.type === ObjectTypes.TRAMPOLINE) {
+                layers[2].push(levelObject);
+            }
+            else if (levelObject.type === ObjectTypes.EVENT_TRIGGER) {
+                layers[6].push(levelObject)
+            }
+            else if (levelObject.type === ObjectTypes.IMAGE_IN_GAME) {
+                layers[7].push(levelObject)
+            }
+            else {
+                layers[1].push(levelObject);
+            }
+        });
+        return layers;
+    }
+
+   switchToNextLevel() {
+    const endingScreenIndex = WorldDataHandler.levels.length - 1;
+
+    let nextLevel;
+    if (PlayMode.customExit?.levelIndex !== undefined) {
+        nextLevel = PlayMode.customExit.levelIndex;
+    } else if (this.playlist && this.playlistIndex < this.playlist.length - 1) {
+        this.playlistIndex++;
+        nextLevel = this.playlist[this.playlistIndex];
+    } else {
+        nextLevel = endingScreenIndex;
+    }
+
+    if (this.currentLevel < endingScreenIndex) {
+        this.currentLevel = nextLevel;
+
+        if (this.currentLevel === endingScreenIndex) {
+            GameStatistics.stopTimer();
+        }
+        this.resetLevel(this.currentLevel);
+        if (typeof LevelNavigationHandler === 'function') {
+            LevelNavigationHandler.updateLevel();
+            LevelNavigationHandler.adaptLevelList();
+        }
+    } else {
+        console.log("error");
+    }
+}
+
+    resetDynamicObjects() {
+        for (var i = this.levelObjects.length; i >= 0; i--) {
+            const laserObject = this.levelObjects[i]?.type === ObjectTypes.LASER;
+            if (this.levelObjects[i]?.type === ObjectTypes.CANON_BALL || this.levelObjects[i]?.type === ObjectTypes.ROCKET
+                || this.levelObjects[i]?.type === ObjectTypes.BULLET
+                || laserObject) {
+                !laserObject && SFXHandler.createSFX(this.levelObjects[i].x, this.levelObjects[i].y, 1)
+                this.levelObjects.splice(i, 1);
+            }
+            if (this.levelObjects[i]?.resetObject) {
+                this.levelObjects[i].resetObject();
+            }
+        }
+        this.paths.forEach(path => path.resetObjectsToInitialPosition());
+        DeadEnemyHandler.reset();
+        this.defeatedEnemyCount = 0;
+        //Check here if tilemaphandler is missing objects from WorldDataHandler (if somethign was deleted)
+        this.enemies.length = 0;
+        this.enemies = this.createInitialObjects(WorldDataHandler.levels[this.currentLevel].enemies);
+    }
+
+    filterObjectsByTypes(types) {
+        return this.levelObjects.filter(levelObject => types.includes(levelObject.type));
+    }
+
+    getLevelHeight() {
+        return this.tileMap.length;
+    }
+
+    getLevelWidth() {
+        return this.tileMap[0].length;
+    }
+
+    getTileValueForPosition(pos) {
+        return Math.floor(pos / this.tileSize);
+    }
+
+    getValuePositionsForTile(tileX, tileY) {
+        return {
+            x: tileX * this.tileSize + this.halfTileSize,
+            y: tileY * this.tileSize + this.halfTileSize,
+        }
+    }
+
+    getTileLayerValueByIndex(y, x) {
+        return this.tileMap[y]?.[x];
+    }
+
+    getTileTypeByPosition(x, y) {
+        const xVal = this.getTileValueForPosition(x);
+        const yVal = this.getTileValueForPosition(y);
+        return this.getTileLayerValueByIndex(yVal, xVal);
+    }
+
+    checkIfPositionAtTheEdge(tilePosX, tilePosY) {
+        return tilePosX === 0 || tilePosY === 0 || tilePosX === this.levelWidth - 1 || tilePosY === this.levelHeight - 1;
+    }
+
+    checkIfStartOrEndingLevel() {
+        return this.currentLevel === 0 || this.currentLevel === WorldDataHandler.levels.length - 1;
+    }
+}
