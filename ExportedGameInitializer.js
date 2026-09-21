@@ -11,6 +11,7 @@ class ExportedGameInitializer {
         WorldDataHandler.backgroundImageSize = allData.backgroundImageSize;
         WorldDataHandler.selectedFont = allData.selectedFont || "DotGothic16";
         WorldDataHandler.customFont = allData.customFont;
+        WorldDataHandler.shuffleLevels = allData.shuffleLevels !== undefined ? allData.shuffleLevels : false;
         if(allData.customFont) {
             FontHandler.loadCustomFont(allData.customFont);
         }

@@ -91,6 +91,8 @@ function resetUIValuesInTool() {
   });
   PlayerAttributesHandler.setDeathType();
   FontHandler.resetValuesinUi();
+  const shuffleEl = document.getElementById("shuffleLevelsChecked");
+  if (shuffleEl) shuffleEl.checked = WorldDataHandler.shuffleLevels ?? true;
 }
 
 function createPlayerAttributesSectionForAllData() {
@@ -123,6 +125,7 @@ function exportGame() {
   //remove everything that is marked with special comments and is not needed
   bundledScripts = bundledScripts.replaceAll(/\/\/startRemoval ([\s\S]*?) \/\/endRemoval/g, "");
   const allData = {};
+  allData.shuffleLevels = WorldDataHandler.shuffleLevels;
   allData.levels = WorldDataHandler.levels;
   allData.gamesName = WorldDataHandler.gamesName;
   allData.endingMessage = WorldDataHandler.endingMessage;

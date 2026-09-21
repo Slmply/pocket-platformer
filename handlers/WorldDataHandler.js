@@ -25,6 +25,7 @@ class WorldDataHandler {
         this.effects = [];
         this.enemyTypeAttributes = {};
         this.pickedUpWeaponTypes = new Set();
+        this.shuffleLevels = false;
         this.resetFontParameters();
     }
 

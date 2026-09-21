@@ -133,20 +133,28 @@ class TileMapHandler {
         const endingScreenIndex = totalLevels - 1;
         const finalPlayableIndex = totalLevels - 2; 
 
+        // Handle small games with 3 or fewer levels (Start Screen, 1 Level, Ending Screen)
+        if (totalLevels <= 3) {
+            return totalLevels === 3 ? [1, endingScreenIndex] : [1];
+        }
+
         const middleLevels = [];
         for (let i = 2; i < finalPlayableIndex; i++) {
             middleLevels.push(i);
         }
 
-        // Shuffle Middle
-        for (let i = middleLevels.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [middleLevels[i], middleLevels[j]] = [middleLevels[j], middleLevels[i]];
+        if (WorldDataHandler.shuffleLevels) {
+            // Shuffle Middle levels
+            for (let i = middleLevels.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [middleLevels[i], middleLevels[j]] = [middleLevels[j], middleLevels[i]];
+            }
+            const selectedMiddle = middleLevels.slice(0, 5);
+            return [1, ...selectedMiddle, finalPlayableIndex, endingScreenIndex];
+        } else {
+            // Sequential progression through all levels
+            return [1, ...middleLevels, finalPlayableIndex, endingScreenIndex];
         }
-        const selectedMiddle = middleLevels.slice(0, 5);
-
-
-        return [1, ...selectedMiddle, finalPlayableIndex, endingScreenIndex];
     }
 
     
