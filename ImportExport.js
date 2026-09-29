@@ -62,6 +62,10 @@ function resetUIValuesInTool() {
   WorldColorChanger.changeLevelColor(1);
   document.getElementById("gamesname").value = WorldDataHandler.gamesName;
   document.getElementById("endingmessage").value = WorldDataHandler.endingMessage;
+  document.getElementById("levelOrder").value = WorldDataHandler.levelOrder;
+  document.getElementById("levelGroup1").value = WorldDataHandler.levelGroupOne;
+  document.getElementById("levelGroup2").value = WorldDataHandler.levelGroupTwo;
+  document.getElementById("levelGroup3").value = WorldDataHandler.levelGroupThree;
   TransitionAnimationHandler.setDurationElementValue(TransitionAnimationHandler.animationFrames);
   TransitionAnimationHandler.setTypeElementValue(TransitionAnimationHandler.animationType);
   SpritePixelArrays.fillAllSprites();
@@ -128,6 +132,10 @@ function exportGame() {
   allData.shuffleLevels = WorldDataHandler.shuffleLevels;
   allData.levels = WorldDataHandler.levels;
   allData.gamesName = WorldDataHandler.gamesName;
+  allData.levelOrder = WorldDataHandler.levelOrder;
+  allData.levelGroupOne = WorldDataHandler.levelGroupOne;
+  allData.levelGroupTwo = WorldDataHandler.levelGroupTwo;
+  allData.levelGroupThree = WorldDataHandler.levelGroupThree;
   allData.endingMessage = WorldDataHandler.endingMessage;
   allData.effects = WorldDataHandler.effects;
   allData.backgroundColor = WorldDataHandler.backgroundColor;

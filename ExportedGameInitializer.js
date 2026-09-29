@@ -4,6 +4,10 @@ class ExportedGameInitializer {
         WorldDataHandler.ensureLevelDataIntegrity();
         WorldDataHandler.gamesName = allData.gamesName;
         WorldDataHandler.endingMessage = allData.endingMessage;
+        WorldDataHandler.levelOrder = allData.levelOrder;
+        WorldDataHandler.levelGroupOne = allData.levelGroupOne;
+        WorldDataHandler.levelGroupTwo = allData.levelGroupTwo;
+        WorldDataHandler.levelGroupThree = allData.levelGroupThree;
         WorldDataHandler.effects = allData.effects;
         WorldDataHandler.backgroundColor = allData.backgroundColor;
         WorldDataHandler.textColor = allData.textColor;

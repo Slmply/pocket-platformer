@@ -126,12 +126,11 @@ class TileMapHandler {
     }
 
     /*
-    *  Playlist generation upon running game 
+    *  Playlist generation upon running game
     */
     generatePlaylist() {
         const totalLevels = WorldDataHandler.levels.length;
         const endingScreenIndex = totalLevels - 1;
-        const finalPlayableIndex = totalLevels - 2; 
 
         // Handle small games with 3 or fewer levels (Start Screen, 1 Level, Ending Screen)
         if (totalLevels <= 3) {
@@ -139,25 +138,83 @@ class TileMapHandler {
         }
 
         const middleLevels = [];
-        for (let i = 2; i < finalPlayableIndex; i++) {
+        for (let i = 1; i < endingScreenIndex; i++) {
             middleLevels.push(i);
         }
 
-        if (WorldDataHandler.shuffleLevels) {
-            // Shuffle Middle levels
-            for (let i = middleLevels.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [middleLevels[i], middleLevels[j]] = [middleLevels[j], middleLevels[i]];
-            }
-            const selectedMiddle = middleLevels.slice(0, 5);
-            return [1, ...selectedMiddle, finalPlayableIndex, endingScreenIndex];
-        } else {
-            // Sequential progression through all levels
-            return [1, ...middleLevels, finalPlayableIndex, endingScreenIndex];
+        // Calculate level groups
+        const g1 = this.readLevelGroup(WorldDataHandler.levelGroupOne);
+        const g2 = this.readLevelGroup(WorldDataHandler.levelGroupTwo);
+        const g3 = this.readLevelGroup(WorldDataHandler.levelGroupThree);
+
+        // Check for default level order
+        if (WorldDataHandler.levelOrder == "~") {
+            return middleLevels;
         }
+
+        // Apply given level order
+        const levelSplit = WorldDataHandler.levelOrder.split(" ");
+
+        // Check for level group markers
+        const g1idx = levelSplit.indexOf("G1");
+        const g2idx = levelSplit.indexOf("G2");
+        const g3idx = levelSplit.indexOf("G3");
+
+        // Splice level groups in order
+        if (g1idx >= 0) {
+            levelSplit.splice(g1idx, 1, ...g1)
+        }
+        if (g2idx >= 0) {
+            levelSplit.splice(g2idx, 1, ...g2)
+        }
+        if (g3idx >= 0) {
+            levelSplit.splice(g3idx, 1, ...g3)
+        }
+
+        // Map str[] to int[] and return final level order
+        return levelSplit.map(element => {
+            return parseInt(element);
+        });
     }
 
-    
+    readLevelGroup(groupString) {
+
+        if (groupString.length <= 0) {
+            return [];
+        }
+
+        const splitString = groupString.split(":");
+        var subGroup = -1;
+        if (splitString.length > 1) {
+            subGroup = splitString[1];
+        }
+
+        var result = splitString[0].split(" ");
+
+        result = result.map(element => {
+            return parseInt(element);
+        });
+
+        if (subGroup > 0) {
+            this.shuffle(result);
+            return result.slice(0, subGroup);
+        }
+
+        return result;
+    }
+
+    shuffle(array) {
+        // Loop from the end of the array down to the second element
+        for (let i = array.length - 1; i > 0; i--) {
+            // Pick a random index from 0 to i
+            const j = Math.floor(Math.random() * (i + 1));
+
+            // Swap elements array[i] and array[j]
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
     initPlaylist() {
         this.playlist = this.generatePlaylist();
         this.playlistIndex = 0;

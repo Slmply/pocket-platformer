@@ -318,6 +318,26 @@
                                         onchange="WorldDataHandler.shuffleLevels = this.checked">
                                     <label for="shuffleLevelsChecked" class="checkBoxText">Shuffle Mid Levels</label>
                                 </div>
+                                <div class="marginTop4">
+                                    <label for="levelOrder">Level Order</label>
+                                    <input id="levelOrder" class="input" type="text" size="15" value="~"
+                                    oninput="changeTitleOrEnding(event, 'levelOrder')"/>
+                                </div>
+                                <div class="marginTop4">
+                                    <label for="levelGroup1">Level Group 1</label>
+                                    <input id="levelGroup1" class="input" type="text" size="15" value=""
+                                    oninput="changeTitleOrEnding(event, 'levelGroupOne')"/>
+                                </div>
+                                <div class="marginTop4">
+                                    <label for="levelGroup2">Level Group 2</label>
+                                    <input id="levelGroup2" class="input" type="text" size="15" value=""
+                                    oninput="changeTitleOrEnding(event, 'levelGroupTwo')"/>
+                                </div>
+                                <div class="marginTop4">
+                                    <label for="levelGroup3">Level Group 3</label>
+                                    <input id="levelGroup3" class="input" type="text" size="15" value=""
+                                    oninput="changeTitleOrEnding(event, 'levelgroupThree')"/>
+                                </div>
                             </details>
                         </div>
                         <div class="subSection">

@@ -17,6 +17,10 @@ class WorldDataHandler {
     static resetGameData() {
         this.gamesName = "Example name";
         this.endingMessage = "Thx for playing!";
+        this.levelOrder = "~";
+        this.levelGroupOne = "";
+        this.levelGroupTwo = "";
+        this.levelGroupThree = "";
         this.backgroundColor = '000000';
         this.backgroundImage = null;
         this.backgroundImageSize = null;
